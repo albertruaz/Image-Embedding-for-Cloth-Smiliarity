@@ -26,7 +26,6 @@ class TestEmbedding:
                 for image_file in image_files:
                     image_path = os.path.join(folder_path, image_file)
                     embedding = self.model.get_image_embedding(image_path)
-                    embedding = embedding.detach().numpy().squeeze()
                     embedding = embedding / np.linalg.norm(embedding)
                     folder_embeddings.append(embedding)
                 
@@ -34,6 +33,50 @@ class TestEmbedding:
                     embeddings[folder] = folder_embeddings
         
         return embeddings
+
+    def save_embeddings(self, filepath: str = "embeddings.json") -> None:
+        """
+        Save embeddings to a JSON file
+        
+        Args:
+            filepath (str): Path to save the embeddings file
+        """
+        # numpy array를 list로 변환한 새로운 dict 생성
+        embeddings_to_save = {}
+        for folder, emb_list in self.embeddings.items():
+            embeddings_to_save[folder] = [emb.tolist() for emb in emb_list]
+
+        # Save to file
+        with open(filepath, 'w') as f:
+            json.dump(embeddings_to_save, f)
+        print(f"Embeddings saved to {filepath}")
+
+    def load_embeddings(self, filepath: str = "embeddings.json") -> dict:
+        """
+        Load embeddings from a JSON file
+        
+        Args:
+            filepath (str): Path to the embeddings file
+            
+        Returns:
+            dict: Dictionary of embeddings
+        """
+        try:
+            with open(filepath, 'r') as f:
+                embeddings_dict = json.load(f)
+            
+            # list로 저장된 데이터를 다시 numpy array로 변환
+            for folder, emb_list in embeddings_dict.items():
+                embeddings_dict[folder] = [np.array(emb) for emb in emb_list]
+            
+            self.embeddings = embeddings_dict
+            print(f"Embeddings loaded from {filepath}")
+            return self.embeddings
+            
+        except FileNotFoundError:
+            print(f"No embeddings file found at {filepath}")
+            return self.get_embeddings()
+
 
     def calculate_accuracy(self, similar_pairs: List[Tuple[str, str, float]], 
                            different_pairs: List[Tuple[str, str, float]], 
@@ -113,7 +156,8 @@ def main():
     all_folders.update(folder for pair in similar_pairs + different_pairs for folder in pair[:2])
 
     # Example usage
-    test = TestEmbedding(model_name=model_name, data_dir=data_dir, folders=all_folders)
+    test = TestEmbedding(model_name=model_name, data_dir=data_dir, model_class=model_class, folders=all_folders)
+    test.save_embeddings()
 
     # Calculate accuracy
     accuracy = test.calculate_accuracy(similar_pairs, different_pairs, all_folders)
