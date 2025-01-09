@@ -3,7 +3,8 @@
 # Set which embedding model to use
 export EMBEDDING_MODEL_FILE="blip_embedding_model"  # or "clip_embedding_model"
 export MODEL_NAME="Salesforce/blip-image-captioning-base"
-
+# export EMBEDDING_MODEL_FILE="mediapipe_embedding_model"
+# export MODEL_NAME="embedder.tflite"
 
 
 

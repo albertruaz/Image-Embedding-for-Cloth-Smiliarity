@@ -14,53 +14,41 @@ class TestEmbedding:
 
     def get_embeddings(self) -> dict:
         embeddings = {}
-        # 지정된 폴더들에 대해서만 임베딩 계산
         for folder in self.folders:
             folder_path = os.path.join(self.data_dir, folder)
             if os.path.isdir(folder_path):
-                # 폴더 내 모든 이미지 파일 찾기
                 image_files = [f for f in os.listdir(folder_path) 
-                             if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+                    if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
                 
                 folder_embeddings = []
                 for image_file in image_files:
                     image_path = os.path.join(folder_path, image_file)
                     embedding = self.model.get_image_embedding(image_path)
-                    embedding = embedding / np.linalg.norm(embedding)
                     folder_embeddings.append(embedding)
                 
-                if folder_embeddings:  # 빈 폴더가 아닌 경우만 저장
-                    embeddings[folder] = folder_embeddings
+                embeddings[folder] = folder_embeddings
         
         return embeddings
+    
+
 
     def save_embeddings(self, filepath: str = "embeddings.json") -> None:
-        """
-        Save embeddings to a JSON file
-        
-        Args:
-            filepath (str): Path to save the embeddings file
-        """
-        # numpy array를 list로 변환한 새로운 dict 생성
         embeddings_to_save = {}
-        for folder, emb_list in self.embeddings.items():
-            embeddings_to_save[folder] = [emb.tolist() for emb in emb_list]
-
-        # Save to file
-        with open(filepath, 'w') as f:
+        for folder, embeddings in self.embeddings.items():
+            serialized_embeddings = []
+            for embedding in embeddings:
+                if isinstance(embedding, np.ndarray):  # numpy.ndarray를 리스트로 변환
+                    serialized_embeddings.append(embedding.tolist())
+                else:
+                    serialized_embeddings.append(embedding)
+            embeddings_to_save[folder] = serialized_embeddings
+            
+        with open(filepath, "w") as f:
             json.dump(embeddings_to_save, f)
         print(f"Embeddings saved to {filepath}")
 
+
     def load_embeddings(self, filepath: str = "embeddings.json") -> dict:
-        """
-        Load embeddings from a JSON file
-        
-        Args:
-            filepath (str): Path to the embeddings file
-            
-        Returns:
-            dict: Dictionary of embeddings
-        """
         try:
             with open(filepath, 'r') as f:
                 embeddings_dict = json.load(f)
@@ -106,12 +94,7 @@ class TestEmbedding:
                     total_weight += 1
                     print("Self Similarity ",folder,": ",similarity)
         
-        # Check similar pairs - higher similarity should give score closer to 1
         for folder1, folder2, weight in similar_pairs:
-            if folder1 not in self.embeddings or folder2 not in self.embeddings:
-                raise ValueError(f"Folders {folder1} or {folder2} not found in embeddings")
-            
-            # Calculate similarity between all image pairs in the folders
             for emb1 in self.embeddings[folder1]:
                 for emb2 in self.embeddings[folder2]:
                     similarity = cosine(emb1, emb2)
@@ -119,14 +102,11 @@ class TestEmbedding:
                     total_weight += weight
                     print("Similar Similarity ", folder1, folder2, ": ",similarity)
                 
-        # Check different pairs - lower similarity should give score closer to 1
         for folder1, folder2, weight in different_pairs:
-            if folder1 not in self.embeddings or folder2 not in self.embeddings:
-                raise ValueError(f"Folders {folder1} or {folder2} not found in embeddings")
             for emb1 in self.embeddings[folder1]:
                 for emb2 in self.embeddings[folder2]:
-                    similarity = -1 * cosine(emb1, emb2)
-                    total_score += similarity * weight
+                    similarity = cosine(emb1, emb2)
+                    total_score += similarity * weight * -1
                     total_weight += weight
                     print("Different Similarity ", folder1, folder2, ": ",similarity)
 
@@ -137,6 +117,7 @@ def main():
     embedding_model_file = os.getenv('EMBEDDING_MODEL_FILE', 'clip_embedding_model')
     model_name = os.getenv('MODEL_NAME', 'openai/clip-vit-base-patch32')
     data_dir = os.getenv('DATA_DIR', './data')
+    
     # Import the specified embedding model
     if embedding_model_file == 'blip_embedding_model':
         from model.blip_embedding_model import BLIPEmbeddingModel
@@ -144,9 +125,11 @@ def main():
     elif embedding_model_file == 'clip_embedding_model':
         from model.clip_embedding_model import CLIPEmbeddingModel
         model_class = CLIPEmbeddingModel
+    elif embedding_model_file == 'mediapipe_embedding_model':
+        from model.mediapipe_embedding_model import MediaPipeEmbeddingModel
+        model_class = MediaPipeEmbeddingModel
     else:
         raise ValueError(f"Unknown embedding model file: {embedding_model_file}")
-    
 
     # Define similar and different pairs from environment variables
     similar_pairs = eval(os.getenv('SIMILAR_PAIRS', '[]'))
@@ -157,11 +140,10 @@ def main():
 
     # Example usage
     test = TestEmbedding(model_name=model_name, data_dir=data_dir, model_class=model_class, folders=all_folders)
-    test.save_embeddings()
-
-    # Calculate accuracy
+    # test.save_embeddings()
     accuracy = test.calculate_accuracy(similar_pairs, different_pairs, all_folders)
-    print("MODEL_NAME: ",model_name)
+    
+    print("MODEL_NAME: ", model_name)
     print(f"Accuracy: {accuracy:.2f}")
 
 if __name__ == "__main__":
