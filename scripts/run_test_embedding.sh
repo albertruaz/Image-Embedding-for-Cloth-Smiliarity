@@ -14,4 +14,4 @@ export DIFFERENT_PAIRS='[("theme1-1", "theme2-1", 0.5), ("theme1-1", "theme2-2",
 export OTHER_FOLDERS='[]'
 
 # Run the Python script
-python test_embedding.py 
+python ./sample/test_embedding.py 

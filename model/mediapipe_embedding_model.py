@@ -8,7 +8,7 @@ import cv2
 class MediaPipeEmbeddingModel:
     def __init__(self, model_name="embedder.tflite"):
 
-        base_options = python.BaseOptions(model_asset_path=model_name)
+        base_options = python.BaseOptions(model_asset_path="./model/" + model_name)
         options = vision.ImageEmbedderOptions(
             base_options=base_options,
             l2_normalize=True
