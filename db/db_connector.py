@@ -55,21 +55,23 @@ class DBConnector:
         
         return tunnel, connection
 
-    def fetch_product_data(self, date_prefix: str = '2025-01-09 09%') -> Dict[int, str]:
+    def fetch_product_data(self, date_prefix: str = '%') -> Dict[int, str]:
         """특정 날짜의 제품 이미지 URL을 조회합니다."""
         tunnel, connection = self.connect()
         
         try:
             with connection.cursor() as cursor:
                 sql = """
-                    SELECT id, main_image
+                    SELECT id, main_image, link
                     FROM product
-                    WHERE created_at LIKE %s
+                    WHERE primary_category_id = 7 
+                    and secondary_category_id = 31
+                    and created_at like '2025-01-1%'
                 """
-                cursor.execute(sql, (date_prefix,))
+                cursor.execute(sql)
                 products = cursor.fetchall()
-            return products 
-            
+            return products
+
         finally:
             connection.close()
             tunnel.close()
@@ -78,7 +80,7 @@ class DBConnector:
         
         product_urls = {
             product_id: self.s3_url_finder.locate(main_image)
-            for product_id, main_image in product_data
+            for product_id, main_image, _ in product_data
         }
         return product_urls
     
