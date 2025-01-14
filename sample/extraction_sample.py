@@ -72,8 +72,12 @@ def main():
     save_to_db = False
     
     db_connector = DBConnector()
-    product_datas = db_connector.fetch_product_data()
-    product_images = db_connector.fetch_product_images(product_datas)
+    try:
+        product_datas = db_connector.fetch_product_data()
+        product_images = db_connector.fetch_product_images(product_datas)
+    finally:
+        db_connector.close()
+
     embedding_model = MediaPipeEmbeddingModel(model_name="embedder.tflite")
     image_embeddings = embedding_model.embed_batch(product_images)
     sim_calc = SimilarityCalculator()
@@ -96,7 +100,11 @@ def main():
 
     # 6) DB에 임베딩 정보와 유사상품 정보 저장
     if save_to_db:
-        db_connector.save_embeddings_and_similarities(image_embeddings, similar_products)
+        try:
+            db_connector.connect()
+            db_connector.save_embeddings_and_similarities(image_embeddings, similar_products)
+        finally:
+            db_connector.close()
 
     
 if __name__ == "__main__":
