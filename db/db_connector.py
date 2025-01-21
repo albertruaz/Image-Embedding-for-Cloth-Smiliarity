@@ -122,34 +122,16 @@ class DBConnector(metaclass=SingletonMeta):
             return products
         finally:
             session.close()
-
-    def save_embeddings(self, embeddings: dict) -> None:
-        """
-        :param embeddings: {product_id: np.ndarray([...])}
-        DB에 임베딩 벡터 저장 (예시로 문자열 형태로 INSERT/UPDATE)
-        """
+            
+    def findLinksById(self, product_id: str) -> list:
         session = self.Session()
         try:
-            for product_id, embedding_vector in embeddings.items():
-                # 임베딩을 문자열로 변환(예: 쉼표 구분)
-                embedding_str = ",".join(map(str, embedding_vector))
-
-                # 예시: 별도 테이블(product_embedding)에 저장하거나,
-                #       product 테이블에 embedding 필드를 추가해 저장할 수도 있음
-                sql = text("""
-                    INSERT INTO product_embedding (product_id, embedding)
-                    VALUES (:product_id, :embedding)
-                    ON DUPLICATE KEY UPDATE
-                        embedding = :embedding
-                """)
-                session.execute(sql, {
-                    "product_id": product_id,
-                    "embedding": embedding_str
-                })
-
-            session.commit()
-        except Exception as e:
-            session.rollback()
-            raise e
+            sql = text("""
+                SELECT link
+                FROM product
+                WHERE id = :product_id
+            """)
+            results = session.execute(sql, {"product_id": product_id}).fetchall()
+            return [row[0] for row in results if row[0]]
         finally:
             session.close()

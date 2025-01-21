@@ -1,5 +1,10 @@
 # /data
+__pycache__/
 
+.DS_Store
 *.json
+**/*.pyc
+*.pyc
+*.txt
 
 .env

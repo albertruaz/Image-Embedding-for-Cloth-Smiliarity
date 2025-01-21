@@ -2,7 +2,7 @@ import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageOps
 import cv2
 import requests
 from io import BytesIO
@@ -17,20 +17,56 @@ class MediaPipeEmbeddingModel:
         self.embedder = vision.ImageEmbedder.create_from_options(options)
         self.session = requests.Session()
 
-    def get_image_embedding(
-        self, 
-        image_url: str,
-        resize: tuple = None
-    ) -> np.ndarray:
+    def resize_with_padding(self, image: Image.Image, target_size: tuple) -> Image.Image:
+        """
+        이미지를 비율을 유지하며 리사이즈하고 패딩을 추가하는 메서드
         
-        resized_image_url = f"{image_url}?width={resize[0]}&height={resize[1]}"
-        response = self.session.get(resized_image_url)
-        if response.status_code != 200:
-            raise Exception(f"Failed to download image: {image_url}")
-        
-        image_data = BytesIO(response.content)
-        pil_image = Image.open(image_data).convert("RGB")
+        :param image: PIL Image 객체
+        :param target_size: (width, height) 목표 크기
+        :return: 리사이즈된 PIL Image 객체
+        """
+        original_width, original_height = image.size
+        target_width, target_height = target_size
 
+        # 원본 이미지 비율 유지
+        scale = min(target_width / original_width, target_height / original_height)
+        new_width = int(original_width * scale)
+        new_height = int(original_height * scale)
+
+        # 이미지 Resize
+        resized_image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+        # 패딩 추가
+        padded_image = ImageOps.pad(resized_image, target_size, method=Image.Resampling.LANCZOS, color=(0, 0, 0))
+        return padded_image
+
+    def get_image_resize(self, image_url: str, resize: tuple = (224, 224)) -> Image.Image:
+        """
+        URL에서 이미지를 다운로드하고 리사이즈하는 메서드
+        
+        :param image_url: 이미지 URL
+        :param resize: (width, height) 리사이즈 크기
+        :return: 처리된 PIL Image 객체
+        """
+        response = self.session.get(image_url)
+        image = Image.open(BytesIO(response.content)).convert("RGB")
+        
+        resized_image = self.resize_with_padding(image, resize)
+        
+        final_buffer = BytesIO()
+        resized_image.save(final_buffer, format='JPEG')
+        return resized_image
+
+    def get_image_embedding(self, image_url: str, resize: tuple = None) -> np.ndarray:
+        """
+        이미지 URL에서 임베딩을 생성하는 메서드
+        
+        :param image_url: 이미지 URL
+        :param resize: (width, height) 리사이즈 크기
+        :return: 이미지 임베딩 벡터
+        """
+        pil_image = self.get_image_resize(image_url, resize)
+        
         mp_image = mp.Image(
             image_format=mp.ImageFormat.SRGB, 
             data=np.array(pil_image)
@@ -51,6 +87,7 @@ class MediaPipeEmbeddingModel:
         embeddings = []
         for product_id, image_url in product_datas:
             try:
+                
                 embedding = self.get_image_embedding(image_url,resize=resize)
                 embeddings.append({
                     "product_id": product_id,
