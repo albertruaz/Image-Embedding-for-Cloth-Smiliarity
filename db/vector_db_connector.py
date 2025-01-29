@@ -73,6 +73,7 @@ class VectorDBConnector:
             self.tunnel.close()
         self.tunnel = None
         self.engine = None
+        VectorDBConnector._instance = None
 
     def create_vector_table(self, dimension: int = 1024):
         """
@@ -86,9 +87,12 @@ class VectorDBConnector:
 
             # 2) 테이블 생성
             create_table_sql = f"""
-            CREATE TABLE IF NOT EXISTS product_embedding (
-                product_id TEXT PRIMARY KEY,
-                embedding VECTOR({dimension})
+            CREATE TABLE IF NOT EXISTS product (
+                id                  BIGINT         PRIMARY KEY,
+                status              VARCHAR(255),
+                primary_category_id BIGINT,
+                secondary_category_id BIGINT,
+                image_vector        VECTOR(1024)
             );
             """
             session.execute(text(create_table_sql))
@@ -98,13 +102,14 @@ class VectorDBConnector:
             raise e
         finally:
             session.close()
+    
     def fetch_product_ids(self):
         """
         product_embedding 테이블에서 모든 product_id를 가져오는 함수
         """
         session = self.Session()
         try:
-            query = text("SELECT product_id FROM product_embedding")
+            query = text("SELECT id FROM product")
             product_ids = session.execute(query).fetchall()
             return [row[0] for row in product_ids]  # 리스트 형태로 반환
         finally:
@@ -115,29 +120,43 @@ class VectorDBConnector:
         try:
             for item in embeddings:
                 product_id = item["product_id"]
-                vector_vals = item["embedding"]
+                image_vector = item["image_vector"]
+                status = item["status"]
+                primary_category_id = item["primary_category_id"]
+                secondary_category_id = item["secondary_category_id"]
 
                 # 벡터 데이터를 PostgreSQL VECTOR 형식으로 변환
-                if not all(isinstance(val, (int, float)) for val in vector_vals):
-                    raise ValueError(f"Vector contains non-numeric values: {vector_vals}")
-                vector_str = "[" + ",".join(map(str, vector_vals)) + "]"
+                if not all(isinstance(val, (int, float)) for val in image_vector):
+                    raise ValueError(f"Vector contains non-numeric values: {image_vector}")
+                vector_str = "[" + ",".join(map(str, image_vector)) + "]"
 
-                # SQL 쿼리 실행
+                # SQL 쿼리 실행 (UPSERT)
                 sql = text("""
-                    INSERT INTO product_embedding (product_id, embedding)
-                    VALUES (:pid, :vec)
-                    ON CONFLICT (product_id)
-                    DO UPDATE SET embedding = EXCLUDED.embedding
+                    INSERT INTO product (id, status, primary_category_id, secondary_category_id, image_vector)
+                    VALUES (:pid, :status, :primary_cat, :secondary_cat, :vec)
+                    ON CONFLICT (id)
+                    DO UPDATE SET 
+                        status = EXCLUDED.status,
+                        primary_category_id = EXCLUDED.primary_category_id,
+                        secondary_category_id = EXCLUDED.secondary_category_id,
+                        image_vector = EXCLUDED.image_vector;
                 """)
 
-                # 벡터 데이터를 문자열로 전달
-                session.execute(sql, {"pid": product_id, "vec": vector_str})
+                session.execute(sql, {
+                    "pid": product_id,
+                    "status": status,
+                    "primary_cat": primary_category_id,
+                    "secondary_cat": secondary_category_id,
+                    "vec": vector_str
+                })
+            
             session.commit()
         except Exception as e:
             session.rollback()
             raise e
         finally:
             session.close()
+
 
     def get_similar_products(self, product_id: str, top_k: int = 10) -> list:
         """
@@ -147,7 +166,7 @@ class VectorDBConnector:
         session = self.Session()
         try:
             # 1) 대상 product_id의 벡터 가져오기
-            query_vec_sql = text("SELECT embedding FROM product_embedding WHERE product_id=:pid")
+            query_vec_sql = text("SELECT image_vector FROM product WHERE id=:pid")
             res = session.execute(query_vec_sql, {"pid": product_id}).fetchone()
             if not res:
                 return []
@@ -157,10 +176,10 @@ class VectorDBConnector:
             # 2) 유사도 계산 (Euclidean distance)
             #    자신 제외, distance ASC로 정렬
             sim_sql = text("""
-                SELECT product_id, (embedding <#> :tvec) AS distance
-                FROM product_embedding
-                WHERE product_id != :pid
-                ORDER BY embedding <#> :tvec
+                SELECT id, (image_vector <#> :tvec) AS distance
+                FROM product
+                WHERE id != :pid
+                ORDER BY image_vector <#> :tvec
                 LIMIT :top_k
             """)
             rows = session.execute(sim_sql, {"tvec": target_vec, "pid": product_id, "top_k": top_k}).fetchall()

@@ -48,7 +48,7 @@ class SimilarityCalculator:
 
         return result
 
-    def get_similar_and_dissimilar_products(self, similarities: dict, top_k: int = 10) -> tuple[dict, dict]:
+    def get_similar_and_dissimilar_products(self, similarities: dict, top_k: int = 100) -> tuple[dict, dict]:
         """
         각 상품별로 가장 유사한 상품 top_k개와 가장 다른 상품 top_k개의 id 리스트를 반환
         

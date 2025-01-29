@@ -95,6 +95,8 @@ class DBConnector(metaclass=SingletonMeta):
             self.tunnel.close()
         self.tunnel = None
         self.engine = None
+        
+        DBConnector._instance = None
 
     def get_s3_url(self, file_name: str) -> str:
         """S3(또는 CloudFront) 경로 생성"""
@@ -104,24 +106,39 @@ class DBConnector(metaclass=SingletonMeta):
             return None
         return f"{protocol}://{cloudfront_domain}/{file_name}"
 
-    def fetch_product_data(self, where_condition: str = "1=1") -> list:
+    def fetch_product_data(self, where_condition: str = "1!=1", limit: int = 500, batch_no: int = 0) -> list:
+        offset = batch_no * limit
+
         session = self.Session()
         try:
             sql = text(f"""
-                SELECT id, main_image
+                SELECT 
+                    id,
+                    main_image,
+                    status,
+                    primary_category_id,
+                    secondary_category_id
                 FROM product
-                WHERE primary_category_id=7 
-                AND secondary_category_id=31 
-                AND {where_condition}
+                WHERE 
+                    -- status LIKE "SALE" AND
+                {where_condition}
+                LIMIT {limit} OFFSET {offset}
             """)
             result = session.execute(sql)
-            # 결과를 리스트로 변환하고 main_image를 S3 URL로 변환
+
             products = []
             for row in result.fetchall():
-                products.append((row[0], self.get_s3_url(row[1]) if row[1] else None))
+                products.append((
+                    row[0],  # id
+                    self.get_s3_url(row[1]) if row[1] else None,  # main_image -> S3 URL
+                    row[2],  # status
+                    row[3],  # primary_category_id
+                    row[4],  # secondary_category_id
+                ))
             return products
         finally:
             session.close()
+
             
     def findLinksById(self, product_id: str) -> list:
         session = self.Session()
