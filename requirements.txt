@@ -1,5 +1,0 @@
-pymysql
-sshtunnel
-mediapipe
-scipy
-numpy

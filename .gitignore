@@ -6,5 +6,6 @@ __pycache__/
 **/*.pyc
 *.pyc
 *.txt
+*.log
 
 .env
