@@ -15,7 +15,7 @@ def main():
     try:
         id_list_str = ",".join(map(str, product_ids))
         where_condition = f"id IN ({id_list_str})"
-        product_datas = mysql_db.fetch_product_data(where_condition, 5000) 
+        product_datas = mysql_db.get_product_data(where_condition, 5000) 
     finally:
         mysql_db.close()
     

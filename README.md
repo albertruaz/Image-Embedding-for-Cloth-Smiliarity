@@ -11,7 +11,7 @@
 - 상품을 등록시 실행
 - ID를 기반으로 해당 상품 이미지의 임베딩 백터 DB에 저장
 
-### 2. extract_current_similars.py
+### 2. extract_current_similar_products.py
 
 - 등록된 상품의 유사 상품 리스트업
 

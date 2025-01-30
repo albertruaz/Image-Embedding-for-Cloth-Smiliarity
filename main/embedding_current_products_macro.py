@@ -11,7 +11,7 @@ def main():
     mysql_db = DBConnector()
     try:
         where_condition = f"created_at LIKE '{date}%' and status = 'SALE'"
-        product_datas = mysql_db.fetch_product_data(where_condition, 200) 
+        product_datas = mysql_db.get_product_data(where_condition, 200) 
     finally:
         mysql_db.close()
     

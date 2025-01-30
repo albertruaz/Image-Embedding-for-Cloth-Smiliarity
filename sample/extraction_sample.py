@@ -73,7 +73,7 @@ def main():
     
     db_connector = DBConnector()
     try:
-        product_datas = db_connector.fetch_product_data()
+        product_datas = db_connector.get_product_data()
         product_images = db_connector.fetch_product_images(product_datas)
     finally:
         db_connector.close()

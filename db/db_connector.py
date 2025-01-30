@@ -1,11 +1,10 @@
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sshtunnel import SSHTunnelForwarder
+from typing import List, Dict
 import os
 from dotenv import load_dotenv
-
 load_dotenv()
-
 class SingletonMeta(type):
     """
     Singleton을 위한 메타클래스.
@@ -106,7 +105,7 @@ class DBConnector(metaclass=SingletonMeta):
             return None
         return f"{protocol}://{cloudfront_domain}/{file_name}"
 
-    def fetch_product_data(self, where_condition: str = "1!=1", limit: int = 500, batch_no: int = 0) -> list:
+    def get_product_data(self, where_condition: str = "1!=1", limit: int = 500, batch_no: int = 0) -> list:
         offset = batch_no * limit
 
         session = self.Session()
@@ -138,9 +137,23 @@ class DBConnector(metaclass=SingletonMeta):
             return products
         finally:
             session.close()
+    
+    def get_product_ids_by_condition(self, where_condition: str = "1!=1") -> list:
+        session = self.Session()
+        try:
+            sql = text(f"""
+                SELECT 
+                    id
+                FROM product
+                WHERE
+                {where_condition}
+            """)
+            result = session.execute(sql).fetchall()
+            return [row[0] for row in result]
+        finally:
+            session.close()
 
-            
-    def findLinksById(self, product_id: str) -> list:
+    def find_links_by_id(self, product_id: str) -> list:
         session = self.Session()
         try:
             sql = text("""
@@ -150,5 +163,25 @@ class DBConnector(metaclass=SingletonMeta):
             """)
             results = session.execute(sql, {"product_id": product_id}).fetchall()
             return [row[0] for row in results if row[0]]
+        finally:
+            session.close()
+
+    def update_similar_products(self, product_similar_products: Dict[str, List[str]]):
+        """
+        여러 개의 product_id에 대해 한 번에 similar_products를 업데이트하는 함수.
+        """
+        session = self.Session()
+        try:
+            sql = text("""
+                UPDATE product
+                SET similar_products = :similar
+                WHERE id = :product_id
+            """)
+            data = [
+                {"product_id": product_id, "similar": ",".join(map(str, similar_list))}
+                for product_id, similar_list in product_similar_products.items()
+            ]
+            session.execute(sql, data)
+            session.commit()
         finally:
             session.close()
