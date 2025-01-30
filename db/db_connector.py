@@ -3,6 +3,8 @@ from sqlalchemy.orm import sessionmaker
 from sshtunnel import SSHTunnelForwarder
 from typing import List, Dict
 import os
+import json
+
 from dotenv import load_dotenv
 load_dotenv()
 class SingletonMeta(type):
@@ -167,21 +169,26 @@ class DBConnector(metaclass=SingletonMeta):
             session.close()
 
     def update_similar_products(self, product_similar_products: Dict[str, List[str]]):
-        """
-        여러 개의 product_id에 대해 한 번에 similar_products를 업데이트하는 함수.
-        """
+        if not product_similar_products:
+            return []
         session = self.Session()
         try:
             sql = text("""
                 UPDATE product
-                SET similar_products = :similar
+                SET similar_ids = :similar
                 WHERE id = :product_id
             """)
+            
             data = [
-                {"product_id": product_id, "similar": ",".join(map(str, similar_list))}
+                {
+                    "product_id": product_id, 
+                    # JSON 배열로 저장할 것이므로 리스트를 직렬화
+                    "similar": json.dumps(similar_list, ensure_ascii=False)
+                }
                 for product_id, similar_list in product_similar_products.items()
             ]
-            session.execute(sql, data)
+            
+            session.execute(sql, data)  # executemany 방식으로 한 번에 여러 UPDATE
             session.commit()
         finally:
             session.close()

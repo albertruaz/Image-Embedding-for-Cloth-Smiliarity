@@ -157,20 +157,36 @@ class VectorDBConnector:
         finally:
             session.close()
 
-    def get_similar_products(self, product_ids: List[str], top_k: int = 10) -> Dict[str, List[str]]:
+    def get_similar_products(self, product_ids: List[str], top_k: int = 100) -> Dict[str, List[str]]:
+        if not product_ids:
+            return []
         session = self.Session()
         try:
             sim_sql = text("""
-                SELECT p1.id AS product_id, p2.id AS similar_id, 
-                (p1.image_vector <#> p2.image_vector) AS distance
-                FROM product p1
-                JOIN product p2 ON p1.id != p2.id
-                WHERE p1.id IN :pids
-                ORDER BY p1.id, (p1.image_vector <#> p2.image_vector)
-                LIMIT :top_k
+                WITH ranked AS (
+                    SELECT 
+                        p1.id AS product_id,
+                        p2.id AS similar_id,
+                        (p1.image_vector <#> p2.image_vector) AS distance,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY p1.id 
+                            ORDER BY (p1.image_vector <#> p2.image_vector)
+                        ) AS rn
+                    FROM product p1
+                    JOIN product p2 ON
+                        p1.id != p2.id
+                        AND p1.primary_category_id = p2.primary_category_id
+                        AND p1.secondary_category_id = p2.secondary_category_id
+                    WHERE
+                        p1.id IN :pids
+                        AND p2.status = 'SALE'
+                )
+                SELECT product_id, similar_id, distance
+                FROM ranked
+                WHERE rn <= :top_k
+                ORDER BY product_id, distance
             """)
             rows = session.execute(sim_sql, {"pids": tuple(product_ids), "top_k": top_k}).fetchall()
-
             # 결과를 Dict 형태로 변환
             product_similars = {}
             for product_id, similar_id, distance in rows:
@@ -183,7 +199,7 @@ class VectorDBConnector:
         finally:
             session.close()
 
-    def get_similar_products_by_id(self, product_id: str, top_k: int = 10) -> list:
+    def get_similar_products_by_id(self, product_id: str, top_k: int = 100) -> list:
         """
         예시로 Euclidean distance 사용 (<->)
         Cosine distance를 사용하려면 (<#>) 또는 다른 문법 사용
