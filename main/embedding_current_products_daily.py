@@ -1,7 +1,6 @@
 from db.db_connector import DBConnector
 from db.vector_db_connector import VectorDBConnector
 from model.mediapipe_embedding_model import MediaPipeEmbeddingModel
-import time
 import argparse
 
 def main():

@@ -1,0 +1,16 @@
+name: recommendation
+channels:
+  - defaults
+dependencies:
+  - python=3.12.8
+  - pip
+  - pip:
+      - sqlalchemy
+      - sshtunnel
+      - pymysql
+      - psycopg2
+      - python-dotenv
+      - mediapipe
+      - numpy
+      - pillow
+      - requests

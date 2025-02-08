@@ -3,7 +3,6 @@ from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 import numpy as np
 from PIL import Image, ImageOps
-import cv2
 import requests
 from io import BytesIO
 
@@ -48,7 +47,7 @@ class MediaPipeEmbeddingModel:
         :param resize: (width, height) 리사이즈 크기
         :return: 처리된 PIL Image 객체
         """
-        response = self.session.get(image_url)
+        response = self.session.get(image_url, headers={"User-Agent": "VingleAI"})
         image = Image.open(BytesIO(response.content)).convert("RGB")
         
         resized_image = self.resize_with_padding(image, resize)
