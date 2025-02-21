@@ -139,6 +139,32 @@ class DBConnector(metaclass=SingletonMeta):
             return products
         finally:
             session.close()
+
+    def get_product_url(self, where_condition: str = "1!=1", limit: int = 5000, batch_no: int = 0) -> list:
+        offset = batch_no * limit
+
+        session = self.Session()
+        try:
+            sql = text(f"""
+                SELECT 
+                    id,
+                    main_image
+                FROM product
+                WHERE
+                {where_condition}
+                LIMIT {limit} OFFSET {offset}
+            """)
+            result = session.execute(sql)
+
+            products = []
+            for row in result.fetchall():
+                products.append((
+                    row[0],  # id
+                    self.get_s3_url(row[1]) if row[1] else None,
+                ))
+            return products
+        finally:
+            session.close()
     
     def get_product_ids_by_condition(self, where_condition: str = "1!=1") -> list:
         session = self.Session()

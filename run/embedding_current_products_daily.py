@@ -22,6 +22,8 @@ def main():
     finally:
         mysql_db.close()
     
+    print("CHECK")
+    print(product_datas)
     # 2) 이미지 임베딩 생성
     model = MediaPipeEmbeddingModel(model_name="embedder.tflite")
     product_datas_with_embedding = model.embed_batch(product_datas, (224, 224))

@@ -84,16 +84,13 @@ class MediaPipeEmbeddingModel:
         :return: Dict[product_id, embedding]
         """
         embeddings = []
-        for product_id, image_url, status, primary_category_id, secondary_category_id in product_datas:
+        for product_id, image_url in product_datas:
             try:
                 
                 embedding = self.get_image_embedding(image_url,resize=resize)
                 embeddings.append({
                     "product_id": product_id,
-                    "image_vector": embedding.tolist(),  # NumPy 배열을 리스트로 변환
-                    "status": status,
-                    "primary_category_id": primary_category_id,
-                    "secondary_category_id": secondary_category_id,
+                    "image_vector": embedding.tolist(),
                 })
             except Exception as e:
                 print(f"Error processing image for product {product_id}: {str(e)}")
